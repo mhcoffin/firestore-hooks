@@ -10,14 +10,16 @@ export const readPage = <T>(path: string) => {
   return wrapPromise(pr)
 }
 
-const cache = new Map()
+// TODO: build a better cache
+type Reader = { read: () => any }
+const cache = new Map<string, Reader>()
 
-export const readPageSlowly = <T>(path: string) => {
-  if (cache.has(path)) {
-    return cache.get(path)
-  }
+export const readPageSlowly = <T>(path: string): Reader => {
+  const cachedResult = cache.get(path)
+  if (cachedResult !== undefined) return cachedResult
+
   console.log(`readPageSlowly(${path}) subscribing...`)
-  const pr = new Promise(resolve => setTimeout(resolve, 3000))
+  const pr = new Promise(resolve => setTimeout(resolve, 2500))
     .then(() => docRef(path.split('/')))
     .then(doc => doc.get())
     .then(snap => snap.data() as T)
@@ -26,6 +28,12 @@ export const readPageSlowly = <T>(path: string) => {
   return result
 }
 
+export const readField = (path: string): Reader => {
+  const [page, field] = path.split(':')
+
+}
+
+// Parse a string of the form "collection/doc/..." and return a doc reference
 const docRef = (path: string[]): DocumentReference => {
   if (path.length === 0 || path.length % 2 !== 0) {
     throw new Error(`doc path must contain an even number of parts: ${path}`)
