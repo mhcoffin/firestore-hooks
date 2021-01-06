@@ -1,7 +1,7 @@
 import React, {Suspense, useEffect, useState} from 'react';
 import './App.css';
 import {auth, User} from "./firebase";
-import {readPageSlowly} from "./readPage";
+import {pageReader} from "./readPage";
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -15,7 +15,7 @@ function App() {
 }
 
 const WithUser = ({user}: { user: User }) => {
-  const reader = readPageSlowly(`Users/${user.uid}`)
+  const reader = pageReader(`Users/${user.uid}`)
   return (
     <div className="App">
       <Suspense fallback={<div>loading...</div>}>
@@ -26,12 +26,13 @@ const WithUser = ({user}: { user: User }) => {
   )
 }
 
-const usePath = (path: string) => {
-  return readPageSlowly(path).read()
+const usePage = (path: string) => {
+  subscribeTo(path)
+  return pageReader(path).read()
 }
 
 const Consumer2 = ({uid}: { uid: string }) => {
-  const value = usePath(`Users/${uid}`)
+  const value = usePage(`Users/${uid}`)
   return (
     <div>
       {JSON.stringify(value)}

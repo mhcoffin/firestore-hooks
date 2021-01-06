@@ -1,36 +1,56 @@
 import {db, DocumentReference} from "./firebase";
 import {wrapPromise} from "./wrapPromise";
 
-export const readPage = <T>(path: string) => {
-  const doc = docRef(path.split('/'))
-  const pr = doc.get()
-    .then((snap) => {
-      return snap.data() as T
-    })
-  return wrapPromise(pr)
+// TODO: build a better cache
+type Reader<T> = { read: () => T }
+const pageCache = new Map<string, Reader<any>>()
+
+type PageSubscription = {
+  unsubscribe: () => void,
+  count: number,
+
 }
 
-// TODO: build a better cache
-type Reader = { read: () => any }
-const cache = new Map<string, Reader>()
+const subscriptionCache = new Map<string, PageSubscription>()
 
-export const readPageSlowly = <T>(path: string): Reader => {
-  const cachedResult = cache.get(path)
-  if (cachedResult !== undefined) return cachedResult
+export const addSubscription = <T>(path: string) => {
+  const c = subscriptionCache.get(path)
+  if (c) {
+    c.count++
+  } else {
+    const unsub = docRef(path.split('/'))
+      .onSnapshot(snap => {
+        if (!snap.exists) {
+          throw new Error(`page does not exist`)
+        }
+        return snap.data() as T
+      })
+    const record = {
+      unsubscribe: unsub,
+      count: 1
+    }
+    subscriptionCache.set(path, record)
+  }
+}
 
-  console.log(`readPageSlowly(${path}) subscribing...`)
-  const pr = new Promise(resolve => setTimeout(resolve, 2500))
+// Returns a promise of page contents.
+// TODO: add a type guard
+export const page = <T>(path: string): Promise<T> => {
+  return new Promise(resolve => setTimeout(resolve, 2500))
     .then(() => docRef(path.split('/')))
     .then(doc => doc.get())
     .then(snap => snap.data() as T)
-  const result = wrapPromise(pr)
-  cache.set(path, result)
-  return result
 }
 
-export const readField = (path: string): Reader => {
-  const [page, field] = path.split(':')
+export const pageReader = <T>(path: string): Reader<T> => {
+  const cachedResult = pageCache.get(path)
+  if (cachedResult !== undefined) return cachedResult
 
+  console.log(`readPageSlowly(${path}) subscribing...`)
+  const pr = page<T>(path)
+  const result = wrapPromise(pr)
+  pageCache.set(path, result)
+  return result
 }
 
 // Parse a string of the form "collection/doc/..." and return a doc reference
